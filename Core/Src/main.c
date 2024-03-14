@@ -175,9 +175,6 @@ int main(void)
 	// START
 	I2C2->CR2 |= (1 << 13);
 	
-	
-	//I2C2->CR2 = (0x69 << 1) | (1 << 16);
-
   // // Set the START bit to begin the address frame
   I2C2->CR2 |= I2C_CR2_START;
 	int doItOnce = 0;
@@ -242,8 +239,6 @@ int main(void)
 		// START
 		I2C2->CR2 |= (1 << 13);
 		
-		
-		
 		// wait until RXNE is set
 		while ( !(I2C2->ISR & (I2C_ISR_RXNE | I2C_ISR_NACKF))) {
 			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);	// toggle green LED
@@ -265,9 +260,8 @@ int main(void)
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET); // turn on orange led
 		I2C2->CR2 |= (1 << 14);	// STOP I2C2
 		doItOnce = 1;
-			
+		
   }
-
 }
 
 /**
