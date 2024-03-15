@@ -25,6 +25,87 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 
+void write(char val) {
+//clear SADD and NBYTES
+	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
+	// set to write
+	I2C2->CR2 &= ~(1 << 10);
+	I2C2->CR2 |= (0x69 << 1) | (1 << 16);
+	I2C2->CR2 |= I2C_CR2_START;
+	
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_TXIS) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+	}
+	
+	// set register of CTRL_REG1
+	I2C2->TXDR = val;
+	
+	// wait until TC is set
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_TC) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+	}
+}
+
+char read() {
+	
+	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
+	I2C2->CR2 = (0x69 << 1) | (1 << 16) | I2C_CR2_RD_WRN;
+	I2C2->CR2 |= I2C_CR2_START;
+	// wait until RXNE is set
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_RXNE) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+	}
+	
+	char val = I2C2->RXDR;
+	
+	// wait until TC is set
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_TC) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			break;
+		}
+
+	}
+	return val;
+}
+
+void stop() {
+	I2C2->CR2 |= (1 << 14);	// STOP I2C2
+}
+
 /**
   * @brief  The application entry point.
   * @retval int
@@ -115,11 +196,12 @@ int main(void)
 	4. Do not set the AUTOEND bit, this lab requires software start/stop operation.
 	5. Setting the START bit to begin the address frame
 	*/
-  I2C2->CR2 = (0x69 << 1) | (1 << 16);
+  //I2C2->CR2 = (0x69 << 1) | (1 << 16);
 
   // Set the START bit to begin the address frame
-  I2C2->CR2 |= I2C_CR2_START;
-
+  //I2C2->CR2 |= I2C_CR2_START;
+	
+	/*
 	// wait until TXIS is set
 	while (1) {
 		if (I2C2->ISR & I2C_ISR_TXIS) {
@@ -192,6 +274,30 @@ int main(void)
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET); // turn on orange led
 		I2C2->CR2 |= (1 << 14);	// STOP I2C2
 	}
+	*/
+	
+	write(0x20);
+	read();
+	stop();
+	write(0x20);
+	write(0x0b);
+	write(0x0b);
+	stop();
+	write(0x20);
+	
+	char val = read();
+	if (val == 0){
+		return 0;
+	}
+	else if (val == 0x0b) {
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
+	}
+	else {
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
+	}
+	
+	stop();
+	
 }
 
 /**
