@@ -45,62 +45,30 @@ int main(void)
 	GPIO_SPEED_FREQ_LOW,
 	GPIO_NOPULL};
 	HAL_GPIO_Init(GPIOC, &initStr); // Initialize pins PC6, PC7, PC8 & PC9
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 high
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // Start PC8 high
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); // Start PC7 high
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET); // Start PC6 high
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // Start PC8 reset
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); // Start PC7 reset
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET); // Start PC6 reset
 	
 	// RCC enable for GPIOB and GPIOC
 	RCC->AHBENR |= (1 << 18); // B
 	RCC->AHBENR |= (1 << 19); // C
 	
 	// RCC enable for I2C2
-	//RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;
 	RCC->APB1ENR |= (1 << 22);
 	
-	// GPIO PB11 to AF
-	GPIOB->MODER |= (1 << 23);
-	GPIOB->MODER &= ~(1 << 22);
-	// GPIO PB13 to AF
-	GPIOB->MODER |= (1 << 27);
-	GPIOB->MODER &= ~(1 << 26);
-	
-	// GPIO PB11 to open drain
-	GPIOB->OTYPER |= (1 << 11);
-	// GPIO PB13 to open drain
-	GPIOB->OTYPER |= (1 << 13);
-	
-	// GPIO PB11 to pull-up
-	GPIOB->PUPDR |= (1 << 22);
-	// GPIO PB13 to pull-up
-	GPIOB->PUPDR |= (1 << 26);
-	
-	// GPIO PB11 to I2C2_SDA AF1 (0001)
-	GPIOB->AFR[1] &= ~(1 << 15);
-	GPIOB->AFR[1] &= ~(1 << 14);
-	GPIOB->AFR[1] &= ~(1 << 13);
-	GPIOB->AFR[1] |= (1 << 12);
-	// GPIO PB13 to I2C2_SCL AF5 (0101)
-	GPIOB->AFR[1] &= ~(1 << 23);
-	GPIOB->AFR[1] |= (1 << 22);
-	GPIOB->AFR[1] &= ~(1 << 21);
-	GPIOB->AFR[1] |= (1 << 20);
-	
-	// GPIO PB14 to output mode
-	GPIOB->MODER &= ~(1 << 29);
-	GPIOB->MODER |= (1 << 28);
-	// GPIO PB14 push pull
-	GPIOB->OTYPER &= ~(1 << 14);
-	// GPIO PB14 init high
-	GPIOB->BSRR |= (1 << 14);
-	
-	// GPIO PC0 to output mode
-	GPIOC->MODER &= ~(1 << 1);
-	GPIOC->MODER |= (1 << 0);
-	// GPIO PC0 to push pull
-	GPIOC->OTYPER &= ~(1 << 0);
-	// GPIO PC0 init high
-	GPIOC->BSRR |= (1 << 14);
+	// Set PB11 & PB13 to AF Mode, PB14 to ouput
+  GPIOB->MODER  |= (1 << 23) | (1 << 27) | (1 << 28);
+	// Set PB11 & PB13 to open-drain
+  GPIOB->OTYPER |= (1 << 11) | (1 << 13);
+	// Set pull-up on PB11 & PB13
+  GPIOB->PUPDR  |= (1 << 22) | (1 << 26);
+	// Set AF1 on PB11 as I2C2_SDA & AF5 on PB13 as I2C2_SCL
+  GPIOB->AFR[1] = 0x00501000;
+	// Set PB14 high
+  GPIOB->BSRR = (1 << 14);
+	// Set PC0 high
+	GPIOC->BSRR = (1 << 0);    
 	
 	// TIMINGR to 100 kHz
 	// PRESC to 1
@@ -118,7 +86,7 @@ int main(void)
 	I2C2->TIMINGR &= ~(1 << 18);
 	I2C2->TIMINGR |= (1 << 17);
 	I2C2->TIMINGR &= ~(1 << 16);
-	// SCLH to 0x0F or 0'b1111
+	// SCLH to 0x0F or 0'b00001111
 	I2C2->TIMINGR &= ~(1 << 15);
 	I2C2->TIMINGR &= ~(1 << 14);
 	I2C2->TIMINGR &= ~(1 << 13);
@@ -136,9 +104,9 @@ int main(void)
 	I2C2->TIMINGR &= ~(1 << 2);
 	I2C2->TIMINGR |= (1 << 1);
 	I2C2->TIMINGR |= (1 << 0);
-	
+
 	// PE
-	I2C2->CR1 |= (1 << 0);
+	I2C2->CR1 |= I2C_CR1_PE;
 	 
 	/* I2C initialization
 	1. Set the slave address in the SADD[7:1] bit field.
@@ -147,121 +115,83 @@ int main(void)
 	4. Do not set the AUTOEND bit, this lab requires software start/stop operation.
 	5. Setting the START bit to begin the address frame
 	*/
-	// SET ADD10 to 0
-	I2C2->CR2 &= ~(1 << 11);
-	// SADD to 0x69 0'b1101001 7 bits
-	/*DONT CARES
-	I2C2->CR2 |= (1 << 9); 
-	I2C2->CR2 |= (1 << 8);*/
-	I2C2->CR2 |= (1 << 7); 
-	I2C2->CR2 |= (1 << 6);
-	I2C2->CR2 &= ~(1 << 5);
-	I2C2->CR2 |= (1 << 4);
-	I2C2->CR2 &= ~(1 << 3);
-	I2C2->CR2 &= ~(1 << 2);
-	I2C2->CR2 |= (1 << 1);
-	/* I2C2->CR2 |= (1 << 0); DONT CARE */
-	// NBYTES to 0x1 or 0'b1
-	I2C2->CR2 &= ~(1 << 23);
-	I2C2->CR2 &= ~(1 << 22);
-	I2C2->CR2 &= ~(1 << 21);
-	I2C2->CR2 &= ~(1 << 20);
-	I2C2->CR2 &= ~(1 << 19);
-	I2C2->CR2 &= ~(1 << 18);
-	I2C2->CR2 &= ~(1 << 17);
-	I2C2->CR2 |= (1 << 16);
-	// RD_WRN to write
-	I2C2->CR2 &= ~(1 << 10);
-	// START
-	I2C2->CR2 |= (1 << 13);
-	
-  // // Set the START bit to begin the address frame
+  I2C2->CR2 = (0x69 << 1) | (1 << 16);
+
+  // Set the START bit to begin the address frame
   I2C2->CR2 |= I2C_CR2_START;
-	int doItOnce = 0;
+
+	// wait until TXIS is set
+	while (1) {
+		if (I2C2->ISR & I2C_ISR_TXIS) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			break;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+		}
+	}
 	
-  while (1)
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET); // turn on red led when TXIS is set
+	// set register of WHO_AM_I to TXDR which is 0x0F or 0'b00001111
+	I2C2->TXDR |= 0x0F;			
+	
+	// wait until TC is set
+	while (1) {
+		if (I2C2->ISR & I2C_ISR_TC) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
+			break;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET);
+		}
+	}
+
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET); // turn on blue led when TXIS is set
+	
+	// reload CR2 but set to read
+	I2C2->CR2 = (0x69 << 1) | (1 << 16) | I2C_CR2_RD_WRN | I2C_CR2_START;
+
+	// wait until RXNE is set
+	while (1) {
+		if (I2C2->ISR & I2C_ISR_RXNE) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
+			break;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+		}
+	}
+	
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET); // turn on green led
+	
+	// wait until TC is set
+	while (1) {
+		if (I2C2->ISR & I2C_ISR_TC) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+			break;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+		}
+	}
+	
+	// check if RXDR matches with 0xD3
+  if (I2C2->RXDR != 0xD3)
   {
-		if (doItOnce == 1) continue;
-	
-		// wait until TXIS is set
-		while ( !(I2C2->ISR & (I2C_ISR_TXIS | I2C_ISR_NACKF))) {
-			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
-			HAL_Delay(50);
-		}
-		
-		// check NACKF is NOT set
-		if (I2C2->ISR & I2C_ISR_NACKF) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET); // Set PC6 high to turn on the red LE  
-		}
-		
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET); // turn on red led
-		// set register of WHO_AM_I to TXDR which is 0x0F or 0'b00001111
-		I2C2->TXDR |= 0x0F;			
-		
-		// wait until TC is set
-		while ( !(I2C2->ISR & (I2C_ISR_TC | I2C_ISR_NACKF))) {
-			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_7);	// toggle blue LED
-			HAL_Delay(50);
-		}
-		
-		if (I2C2->ISR & I2C_ISR_NACKF) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); // Set PC6 high to turn on the red LE  
-		}
-		
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET); // turn on blue led
-		// reload CR2 but set to read
-		//I2C2->CR2 = (0x69 << 1) | (1 << 16) | I2C_CR2_RD_WRN | I2C_CR2_START;
-		
-		// SET ADD10 to 0
-		I2C2->CR2 &= ~(1 << 11);
-		// SADD to 0x69 0'b1101001 7 bits
-		/*I2C2->CR2 |= (1 << 9); DONT CARES
-		I2C2->CR2 |= (1 << 8);*/
-		I2C2->CR2 |= (1 << 7); 
-		I2C2->CR2 |= (1 << 6);
-		I2C2->CR2 &= ~(1 << 5);
-		I2C2->CR2 |= (1 << 4);
-		I2C2->CR2 &= ~(1 << 3);
-		I2C2->CR2 &= ~(1 << 2);
-		I2C2->CR2 |= (1 << 1);
-		/* I2C2->CR2 |= (1 << 0); DONT CARE */
-		// NBYTES to 0x1 or 0'b1
-		I2C2->CR2 &= ~(1 << 23);
-		I2C2->CR2 &= ~(1 << 22);
-		I2C2->CR2 &= ~(1 << 21);
-		I2C2->CR2 &= ~(1 << 20);
-		I2C2->CR2 &= ~(1 << 19);
-		I2C2->CR2 &= ~(1 << 18);
-		I2C2->CR2 &= ~(1 << 17);
-		I2C2->CR2 |= (1 << 16);
-		// RD_WRN to read
-		I2C2->CR2 |= (1 << 10);
-		// START
-		I2C2->CR2 |= (1 << 13);
-		
-		// wait until RXNE is set
-		while ( !(I2C2->ISR & (I2C_ISR_RXNE | I2C_ISR_NACKF))) {
-			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);	// toggle green LED
-			HAL_Delay(50);
-		}
-		if (I2C2->ISR & I2C_ISR_NACKF) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // turn on red led
-		}
-		
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET); // turn on green led
-		
-		// wait until TC is set
-		while ( !(I2C2->ISR & (I2C_ISR_TC | I2C_ISR_NACKF))) {
-			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);	// toggle orange LED
-			HAL_Delay(50);
-		}
-		
-		// check if RXDR matches with 0xD3 or 211
+		// TURN OFF ALL LEDS IF RXDR DON'T MATCH
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+  }
+	else {
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET); // turn on orange led
 		I2C2->CR2 |= (1 << 14);	// STOP I2C2
-		doItOnce = 1;
-		
-  }
+	}
 }
 
 /**
