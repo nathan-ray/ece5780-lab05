@@ -24,9 +24,15 @@
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+char read();
+void stop();
+void write(char val);
+char writeToRegister(char addr, char value);
+int16_t readXAxis();
+int16_t readYAxis();
 
 void write(char val) {
-//clear SADD and NBYTES
+	//clear SADD and NBYTES
 	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
 	// set to write
 	I2C2->CR2 &= ~(1 << 10);
@@ -64,8 +70,61 @@ void write(char val) {
 	}
 }
 
-char read() {
+char writeToRegister(char addr, char value) {
+	//clear SADD and NBYTES
+	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
+	// set to write
+	I2C2->CR2 &= ~(1 << 10);
+	I2C2->CR2 |= (0x69 << 1) | (2 << 16);
+	I2C2->CR2 |= I2C_CR2_START;
 	
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_TXIS) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+	}
+	
+	I2C2->TXDR = addr;
+	
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_TXIS) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+	}
+	
+	I2C2->TXDR = value;
+	
+	// wait until TC is set
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_TC) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+	}
+	return 0;
+}
+
+char read() {
 	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
 	I2C2->CR2 = (0x69 << 1) | (1 << 16) | I2C_CR2_RD_WRN;
 	I2C2->CR2 |= I2C_CR2_START;
@@ -89,12 +148,12 @@ char read() {
 	while (1) {
 		
 		if (I2C2->ISR & I2C_ISR_NACKF) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
 			return 0;
 		}
 		
 		if (I2C2->ISR & I2C_ISR_TC) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
 			break;
 		}
 
@@ -104,6 +163,120 @@ char read() {
 
 void stop() {
 	I2C2->CR2 |= (1 << 14);	// STOP I2C2
+}
+
+int16_t readXAxis() {
+	int16_t xAxis = 0;
+	write(0xA8);
+	stop();
+	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
+	I2C2->CR2 = (0x69 << 1) | (2 << 16) | I2C_CR2_RD_WRN;
+	I2C2->CR2 |= I2C_CR2_START;
+	
+	// wait for first 8-bit data
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_RXNE) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+	}
+	
+	xAxis = I2C2->RXDR;
+	
+	// wait for second 8-bit data
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_RXNE) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+	}
+
+	xAxis |= (I2C2->RXDR << 8);
+	
+	// wait until TC is set
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_TC) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+
+	}
+	return xAxis;
+}
+
+int16_t readYAxis() {
+	int16_t yAxis = 0;
+	write(0xAA);
+	stop();
+	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
+	I2C2->CR2 = (0x69 << 1) | (2 << 16) | I2C_CR2_RD_WRN;
+	I2C2->CR2 |= I2C_CR2_START;
+	
+	// wait for first 8-bit data
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_RXNE) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+	}
+	
+	yAxis = I2C2->RXDR;
+	
+	// wait for second 8-bit data
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_RXNE) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+	}
+
+	yAxis |= (I2C2->RXDR << 8);
+	
+	// wait until TC is set
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_TC) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+
+	}
+	return yAxis;
 }
 
 /**
@@ -275,28 +448,116 @@ int main(void)
 		I2C2->CR2 |= (1 << 14);	// STOP I2C2
 	}
 	*/
-	
 	write(0x20);
-	read();
-	stop();
-	write(0x20);
-	write(0x0b);
-	write(0x0b);
-	stop();
-	write(0x20);
+	//writeToRegister(addr, val);
+	// ##############################################################
+	// WRITING 0x0B to CTRL_REG1
+	// ##############################################################
+	//clear SADD and NBYTES
+	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
+	// set to write
+	I2C2->CR2 &= ~(1 << 10);
+	I2C2->CR2 |= (0x69 << 1) | (2 << 16);
+	I2C2->CR2 |= I2C_CR2_START;
 	
-	char val = read();
-	if (val == 0){
-		return 0;
-	}
-	else if (val == 0x0b) {
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
-	}
-	else {
-		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_TXIS) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
 	}
 	
-	stop();
+	I2C2->TXDR = 0x20;
+	
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_TXIS) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+	}
+	
+	I2C2->TXDR = 0x0B;
+	
+	// wait until TC is set
+	while (1) {
+		
+		if (I2C2->ISR & I2C_ISR_NACKF) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			return 0;
+		}
+		
+		if (I2C2->ISR & I2C_ISR_TC) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			break;
+		}
+	}
+	
+	// read CTRL_REG1 to make sure data is set correctly
+	write(0x20);
+	if (read() != 0x0b) {
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+	}
+	
+	// ##############################################################
+	// SETUP LEDS
+	// ##############################################################
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+	// ##############################################################
+	// READING FROM GYROSCOPE
+	// ##############################################################
+	
+	int16_t xAxis = 0;
+	int16_t yAxis = 0;
+	const int16_t threshold = 0x01FF;
+	while (1) {
+		xAxis = readXAxis();
+		yAxis = readYAxis();
+		
+		if (xAxis > threshold) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+		}
+		else {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+		}
+		
+		if (yAxis < 0 - threshold) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
+		}
+		else {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET);
+		}
+		
+		if (xAxis < 0 - threshold) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
+		}
+		else {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+		}
+		
+		if (yAxis > threshold) {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+		}
+		else {
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+		}
+		
+		HAL_Delay(100);
+	}
 	
 }
 
