@@ -31,6 +31,10 @@ char writeToRegister(char addr, char value);
 int16_t readXAxis();
 int16_t readYAxis();
 
+/*
+ * Writes the val onto TSIX.
+ *
+ */
 void write(char val) {
 	//clear SADD and NBYTES
 	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
@@ -70,60 +74,9 @@ void write(char val) {
 	}
 }
 
-char writeToRegister(char addr, char value) {
-	//clear SADD and NBYTES
-	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
-	// set to write
-	I2C2->CR2 &= ~(1 << 10);
-	I2C2->CR2 |= (0x69 << 1) | (2 << 16);
-	I2C2->CR2 |= I2C_CR2_START;
-	
-	while (1) {
-		
-		if (I2C2->ISR & I2C_ISR_NACKF) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
-			return 0;
-		}
-		
-		if (I2C2->ISR & I2C_ISR_TXIS) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
-			break;
-		}
-	}
-	
-	I2C2->TXDR = addr;
-	
-	while (1) {
-		
-		if (I2C2->ISR & I2C_ISR_NACKF) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
-			return 0;
-		}
-		
-		if (I2C2->ISR & I2C_ISR_TXIS) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
-			break;
-		}
-	}
-	
-	I2C2->TXDR = value;
-	
-	// wait until TC is set
-	while (1) {
-		
-		if (I2C2->ISR & I2C_ISR_NACKF) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
-			return 0;
-		}
-		
-		if (I2C2->ISR & I2C_ISR_TC) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
-			break;
-		}
-	}
-	return 0;
-}
-
+/* 
+ * Returns the byte from RXDR.
+ */
 char read() {
 	I2C2->CR2 &= ~((0x7F << 16) | (0x3FF << 0));
 	I2C2->CR2 = (0x69 << 1) | (1 << 16) | I2C_CR2_RD_WRN;
@@ -161,10 +114,16 @@ char read() {
 	return val;
 }
 
+/*
+ * Stops the I2C2.
+ */
 void stop() {
 	I2C2->CR2 |= (1 << 14);	// STOP I2C2
 }
 
+/*
+ * Reads the x-axis from the gyroscope.
+ */
 int16_t readXAxis() {
 	int16_t xAxis = 0;
 	write(0xA8);
@@ -222,6 +181,9 @@ int16_t readXAxis() {
 	return xAxis;
 }
 
+/*
+ * Reads the y-axis from the gyroscope.
+ */
 int16_t readYAxis() {
 	int16_t yAxis = 0;
 	write(0xAA);
@@ -289,8 +251,8 @@ int main(void)
   SystemClock_Config();
 	__HAL_RCC_GPIOC_CLK_ENABLE(); // Enable the GPIOC clock in the RCC
 	
-	// ORANGE -> 9
-	// GREEN  -> 8
+	// GREEN  -> 9
+	// ORANGE -> 8
 	// BLUE		-> 7
 	// RED		-> 6
 	// Set up a configuration struct to pass to the initialization function
@@ -448,8 +410,7 @@ int main(void)
 		I2C2->CR2 |= (1 << 14);	// STOP I2C2
 	}
 	*/
-	write(0x20);
-	//writeToRegister(addr, val);
+	
 	// ##############################################################
 	// WRITING 0x0B to CTRL_REG1
 	// ##############################################################
@@ -508,6 +469,7 @@ int main(void)
 	write(0x20);
 	if (read() != 0x0b) {
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+		return 0;
 	}
 	
 	// ##############################################################
@@ -523,16 +485,16 @@ int main(void)
 	
 	int16_t xAxis = 0;
 	int16_t yAxis = 0;
-	const int16_t threshold = 0x01FF;
+	const int16_t threshold = 0x00FF;
 	while (1) {
 		xAxis = readXAxis();
 		yAxis = readYAxis();
 		
 		if (xAxis > threshold) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
 		}
 		else {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
 		}
 		
 		if (yAxis < 0 - threshold) {
@@ -550,10 +512,10 @@ int main(void)
 		}
 		
 		if (yAxis > threshold) {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
 		}
 		else {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
 		}
 		
 		HAL_Delay(100);
